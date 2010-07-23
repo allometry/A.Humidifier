@@ -223,9 +223,10 @@ public class AHumidifier extends Script implements PaintListener, ServerMessageL
 				5,
 				5);
 		
-		log("height " + topRightScoreboard.getHeight());
+		int wholePercentage = skills.getPercentToNextLevel(Skills.getStatIndex("Magic"));
+		Double percentToWidth = Math.floor(128 * (wholePercentage / 100));
 		
-		Double percentToWidth = Math.floor(128 * (skills.getPercentToNextLevel(Skills.getStatIndex("Magic")) / 100));
+		log("%" + wholePercentage);
 		
 		RoundRectangle2D progressBar = new RoundRectangle2D.Float(
 				Scoreboard.gameCanvasRight - 128,
