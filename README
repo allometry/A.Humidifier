@@ -1,0 +1,12 @@
+A. Humidifier (Allometry Humidifier)
+
+This script is designed for RuneDev and is intended for filling vials with
+the lunar humidify spell at any bank, including the grand exchange.
+
+Before starting this script, ensure that your bank is currently showing both
+empty and filled vials on the same tab. This script will not look for your
+bank items!
+
+In addition, it is recommended that you sell your vials at or above market
+price. This script is capable of fluctuating market prices and a steep
+decrease in filled vial price would make this script non-profitable.
