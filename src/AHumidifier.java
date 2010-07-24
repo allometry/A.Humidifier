@@ -461,24 +461,26 @@ public class AHumidifier extends Script implements PaintListener {
 		@Override
 		public void run() {
 			while(isThreadsRunning) {
-				switch(random(1, 11) % 2) {
-				case 1:
-					if(random(1,11) % 2 == 0) {
-						isCameraRotating = true;
-						setCameraRotation(random(1,360));
-						isCameraRotating = false;
+				while(isLoggedIn() && !isPaused) {
+					switch(random(1, 11) % 2) {
+					case 1:
+						if(random(1,11) % 2 == 0) {
+							isCameraRotating = true;
+							setCameraRotation(random(1,360));
+							isCameraRotating = false;
+						}
+
+						long c1Timeout = System.currentTimeMillis() + random(30000, 60000);
+						while(System.currentTimeMillis() < c1Timeout && isThreadsRunning) {}
+
+						break;
+
+					default:
+						long c2Timeout = System.currentTimeMillis() + random(30000, 60000);
+						while(System.currentTimeMillis() < c2Timeout && isThreadsRunning) {}
+
+						break;
 					}
-
-					long c1Timeout = System.currentTimeMillis() + random(30000, 60000);
-					while(System.currentTimeMillis() < c1Timeout && isThreadsRunning) {}
-
-					break;
-
-				default:
-					long c2Timeout = System.currentTimeMillis() + random(30000, 60000);
-					while(System.currentTimeMillis() < c2Timeout && isThreadsRunning) {}
-
-					break;
 				}
 			}
 		}
@@ -496,13 +498,15 @@ public class AHumidifier extends Script implements PaintListener {
 		@Override
 		public void run() {
 			while(isThreadsRunning) {
-				currentMagicEP = skills.getCurrentSkillExp(Skills.getStatIndex("Magic"));
-				currentMagicLevel = skills.getCurrSkillLevel(Skills.getStatIndex("Magic"));
-				
-				if(currentMagicLevel > startingMagicLevel)
-					magicEPEarnedWidgetText = numberFormatter.format((currentMagicEP - startingMagicEP)) + " (+" + (currentMagicLevel - startingMagicLevel) + ")";
-				else
-					magicEPEarnedWidgetText = numberFormatter.format((currentMagicEP - startingMagicEP));
+				while(isLoggedIn() && !isPaused) {
+					currentMagicEP = skills.getCurrentSkillExp(Skills.getStatIndex("Magic"));
+					currentMagicLevel = skills.getCurrSkillLevel(Skills.getStatIndex("Magic"));
+					
+					if(currentMagicLevel > startingMagicLevel)
+						magicEPEarnedWidgetText = numberFormatter.format((currentMagicEP - startingMagicEP)) + " (+" + (currentMagicLevel - startingMagicLevel) + ")";
+					else
+						magicEPEarnedWidgetText = numberFormatter.format((currentMagicEP - startingMagicEP));
+				}
 			}
 		}
 	}
