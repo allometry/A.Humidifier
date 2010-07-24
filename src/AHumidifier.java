@@ -214,7 +214,7 @@ public class AHumidifier extends Script implements PaintListener {
 	
 	@Override
 	public int loop() {
-		if(isPaused || isCameraRotating) return 1;
+		if(isPaused || isCameraRotating || !isLoggedIn()) return 1;
 		
 		if(!canCastHumidify())
 			stopScript(true);
@@ -336,7 +336,7 @@ public class AHumidifier extends Script implements PaintListener {
 
 	@Override
 	public void onRepaint(Graphics g2) {
-		if(isPaused) return ;
+		if(isPaused || !isLoggedIn()) return ;
 		
 		Graphics2D g = (Graphics2D)g2;
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
