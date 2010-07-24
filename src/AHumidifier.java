@@ -286,7 +286,8 @@ public class AHumidifier extends Script implements PaintListener {
 					}
 				}
 			}
-			return random(1000, 2000);
+			//return random(1000, 2000);
+			return 1;
 		}
 		
 		if(isInventoryFull()) {
@@ -330,7 +331,7 @@ public class AHumidifier extends Script implements PaintListener {
 		
 		antiban = null;
 		monitor = null;
-		
+				
 		return ;
 	}
 
@@ -461,7 +462,7 @@ public class AHumidifier extends Script implements PaintListener {
 		@Override
 		public void run() {
 			while(isThreadsRunning) {
-				while(isLoggedIn() && !isPaused) {
+				while(isLoggedIn() && !isPaused && isThreadsRunning) {
 					switch(random(1, 11) % 2) {
 					case 1:
 						if(random(1,11) % 2 == 0) {
@@ -498,7 +499,7 @@ public class AHumidifier extends Script implements PaintListener {
 		@Override
 		public void run() {
 			while(isThreadsRunning) {
-				while(isLoggedIn() && !isPaused) {
+				while(isLoggedIn() && !isPaused && isThreadsRunning) {
 					currentMagicEP = skills.getCurrentSkillExp(Skills.getStatIndex("Magic"));
 					currentMagicLevel = skills.getCurrSkillLevel(Skills.getStatIndex("Magic"));
 					
