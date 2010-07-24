@@ -3,6 +3,7 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
 import java.awt.geom.RoundRectangle2D;
 import java.awt.image.ImageObserver;
@@ -15,13 +16,12 @@ import java.util.Map;
 
 import javax.imageio.ImageIO;
 
-import org.rsbot.event.events.ServerMessageEvent;
 import org.rsbot.event.listeners.PaintListener;
-import org.rsbot.event.listeners.ServerMessageListener;
 import org.rsbot.script.GEItemInfo;
 import org.rsbot.script.Script;
 import org.rsbot.script.ScriptManifest;
 import org.rsbot.script.Skills;
+import org.rsbot.script.wrappers.RSInterfaceChild;
 
 /**
  * A. Humidifier (Allometry Humidifier)
@@ -58,24 +58,45 @@ import org.rsbot.script.Skills;
  * SOFTWARE.
  * 
  * @author allometry
- * @version 0.1
+ * @version 1.0
  * @since 0.1
  */
 
-@ScriptManifest(authors = { "Allometry" }, category = "Magic", name = "A. Humidifier", description = "Allometry Humidifier", summary = "Fills vials with humidify spell", version = 0.1)
-public class AHumidifier extends Script implements PaintListener, ServerMessageListener {
-	private boolean isMonitorRunning = true, isRunning = false;
+@ScriptManifest(authors = { "Allometry" }, category = "Magic", name = "A. Humidifier", version = 1.0,
+		description = "" +
+				"<html>" +
+				"<head>" +
+				"<style type=\"text/css\">" +
+				"body {background: #000 url(http://scripts.allometry.com/app/webroot/img/gui/window.jpg);" +
+				"font-family: Georgia, 'Times New Roman', Times, serif;" +
+				"font-size: 12px;font-weight: normal;" +
+				"padding: 50px 10px 45px 10px;}" +
+				"</style>" +
+				"</head>" +
+				"<body>" +
+				"<p>Allometry Humidifier</p>" +
+				"<p>Supports Fire, Water and Steam staffs</p>" +
+				"<p>Astrals in inventory. Empty vials visible in bank!</p>" +
+				"<p>For more info, visit the" +
+				"thread on the RuneDev forums!</p>" +
+				"</body>" +
+				"</html>")
+public class AHumidifier extends Script implements PaintListener {
+	private boolean hasFireStaff = false, hasSteamStaff = false, hasWaterStaff = false;
+	private boolean isCameraRotating = false, isScriptLoaded = false, isThreadsRunning = true; 
 	
 	private int emptyVialID = 229, filledVialID = 227;
-	
+	private int astralRuneID = 9075, fireRuneID = 554, waterRuneID = 555;
+	private int fireStaffID = 1387, steamStaffID = 11736, waterStaffID = 1383;
 	private int filledVialMarketPrice = 0;
-	private int accumulatedHumidifyCasts = 0, accumulatedFilledVials = 0, accumulatedGold = 0;
-	private int startingMagicEP = 0, startingMagicLevel = 0;
-	
+	private int accumulatedHumidifyCasts = 0, accumulatedFilledVials = 0;
+	private int startingMagicEP = 0, startingMagicLevel = 0, currentMagicEP = 0, currentMagicLevel = 0;
 	private int humidifyCastsWidgetIndex = 0, vialsFilledWidgetIndex = 0, approxGoldAccumulatedWidgetIndex = 0;
 	private int currentRuntimeWidgetIndex = 0, magicEPEarnedWidgetIndex = 0;
 	
-	private long startingTime = 0;
+	private long startingTime = 0, failsafeTimeout = 0;
+	
+	private Antiban antiban = new Antiban();
 	
 	private Image coinImage, cursorImage, drinkImage, sumImage, timeImage, weatherImage;
 	private ImageObserver observer;
@@ -91,7 +112,7 @@ public class AHumidifier extends Script implements PaintListener, ServerMessageL
 	
 	private String magicEPEarnedWidgetText = "";
 	
-	private Thread monitorThread;
+	private Thread antibanThread, monitorThread;
 	
 	@Override
 	public boolean onStart(Map<String,String> args) {
@@ -119,6 +140,24 @@ public class AHumidifier extends Script implements PaintListener, ServerMessageL
 			log.info("Success! The filled vial price is " + filledVialMarketPrice + "gp");
 		} catch (Exception e) {
 			log.warning("There was an issue trying to read the filled vial price from the web...");
+		}
+		
+		try {
+			failsafeTimeout = System.currentTimeMillis() + 5000;
+			while(getCurrentTab() != TAB_EQUIPMENT && System.currentTimeMillis() < failsafeTimeout) {
+				openTab(TAB_EQUIPMENT);
+				wait(1000);
+			}
+			
+			if(getCurrentTab() == TAB_EQUIPMENT)
+				if(equipmentContains(fireStaffID))
+					hasFireStaff = true;
+				if(equipmentContains(steamStaffID))
+					hasSteamStaff = true;
+				if(equipmentContains(waterStaffID))
+					hasWaterStaff = true;			
+		} catch (Exception e) {
+			log.warning("There was an issue checking for player equpiment...");
 		}
 		
 		try {
@@ -162,32 +201,134 @@ public class AHumidifier extends Script implements PaintListener, ServerMessageL
 			log.warning("There was an issue instantiating some or all objects...");
 		}
 		
+		antibanThread = new Thread(antiban);
 		monitorThread = new Thread(monitor);
 		
-		isRunning = true;
+		antibanThread.start();
+		monitorThread.start();
+		
+		isScriptLoaded = true;
 		
 		return true;
 	}
 	
 	@Override
 	public int loop() {
+		if(isPaused || isCameraRotating) return 1;
+		
+		if(!canCastHumidify())
+			stopScript(true);
+		
+		if(inventoryEmptyExcept(astralRuneID)) {
+			failsafeTimeout = System.currentTimeMillis() + 5000;
+			while(getCurrentTab() != TAB_INVENTORY && System.currentTimeMillis() < failsafeTimeout) {
+				openTab(TAB_INVENTORY);
+				wait(1000);
+			}
+			
+			failsafeTimeout = System.currentTimeMillis() + 5000;
+			while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout) {
+				bank.open(true);
+				wait(1000);
+			}
+			
+			if(bank.isOpen()) {
+				if(bank.getCount(emptyVialID) <= getInventoryCount() && bank.getCount(emptyVialID) > 1) {
+					bank.withdraw(emptyVialID, bank.getCount(emptyVialID) - 1);
+					wait(random(700, 1000));
+				} else if(bank.getCount(emptyVialID) <= 1) {
+					stopScript(true);
+				} else {
+					bank.withdraw(emptyVialID, 0);
+					wait(random(700, 1000));
+				}
+			}
+			
+			return 1;
+		}
+		
+		if(getInventoryCount(emptyVialID) > 0) {
+			if(bank.isOpen()) bank.close();
+			
+			int emptyVialsInventory = getInventoryCount(emptyVialID);
+
+			failsafeTimeout = System.currentTimeMillis() + 5000;
+			while(getCurrentTab() != TAB_MAGIC && System.currentTimeMillis() < failsafeTimeout) {
+				openTab(TAB_MAGIC);
+				wait(1000);
+			}
+			
+			if(getCurrentTab() == TAB_MAGIC) {
+				RSInterfaceChild humidifyInterface = getInterface(430, 29);
+				
+				failsafeTimeout = System.currentTimeMillis() + 5000;
+				while(!isMouseInArea(humidifyInterface.getArea()) && System.currentTimeMillis() < failsafeTimeout) {
+					moveMouse(humidifyInterface.getAbsoluteX() + random(4, 8), humidifyInterface.getAbsoluteY() + random(4, 8), true);
+				}
+				
+				if(isMouseInArea(humidifyInterface.getArea())) {
+					if(atInterface(humidifyInterface)) {
+						failsafeTimeout = System.currentTimeMillis() + 5000;
+						while(getInventoryCount(filledVialID) != emptyVialsInventory && getCurrentTab() == TAB_MAGIC && System.currentTimeMillis() < failsafeTimeout) {
+							atInterface(humidifyInterface);
+							wait(1000);
+						}
+						
+						failsafeTimeout = System.currentTimeMillis() + 5000;
+						while(getInventoryCount(filledVialID) != emptyVialsInventory && System.currentTimeMillis() < failsafeTimeout) {
+							wait(1000);
+						}
+						
+						if(getInventoryCount(filledVialID) == emptyVialsInventory) {
+							accumulatedFilledVials += getInventoryCount(filledVialID);
+							accumulatedHumidifyCasts++;
+						}
+					}
+				}
+			}
+			return random(1000, 2000);
+		}
+		
+		if(isInventoryFull()) {
+			failsafeTimeout = System.currentTimeMillis() + 5000;
+			while(getCurrentTab() != TAB_INVENTORY && System.currentTimeMillis() < failsafeTimeout) {
+				openTab(TAB_INVENTORY);
+				wait(1000);
+			}
+			
+			failsafeTimeout = System.currentTimeMillis() + 5000;
+			while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout) {
+				bank.open(true);
+				wait(1000);
+			}
+			
+			if(bank.isOpen()) {
+				bank.depositAllExcept(astralRuneID, fireRuneID, waterRuneID);
+				wait(random(1250, 1500));
+			}
+			
+			return 1;
+		}
+		
 		return 1;
 	}
 	
 	@Override
 	public void onFinish() {
-		log.info("Stopping monitor thread...");
+		log.info("Stopping threads...");
 		
-		//Gracefully stop monitorThread
-		while(monitorThread.isAlive()) {
-			isMonitorRunning = false;
-			monitorThread.notifyAll();
+		//Gracefully stop threads
+		while(monitorThread.isAlive() && antibanThread.isAlive()) {
+			isThreadsRunning = false;
 		}
 		
-		log.info("Monitor thread stopped...");
+		log.info("Threads stopped...");
 		
-		//Gracefully release thread and runnable objects
+		//Gracefully release threads and runnable objects
+		antibanThread = null;
 		monitorThread = null;
+		
+		antiban = null;
 		monitor = null;
 		
 		return ;
@@ -195,10 +336,18 @@ public class AHumidifier extends Script implements PaintListener, ServerMessageL
 
 	@Override
 	public void onRepaint(Graphics g2) {
-		if(!isRunning) return ;
+		if(isPaused) return ;
 		
 		Graphics2D g = (Graphics2D)g2;
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		
+		if(!isScriptLoaded) {
+			Scoreboard loadingBoard = new Scoreboard(Scoreboard.BOTTOM_RIGHT, 128, 5);
+			loadingBoard.addWidget(new ScoreboardWidget(timeImage, "Loading..."));
+			loadingBoard.drawScoreboard(g);
+			
+			return ;
+		}
 		
 		//Draw Custom Mouse Cursor
 		g.drawImage(cursorImage, getMouseLocation().x - 16, getMouseLocation().y - 16, observer);
@@ -206,7 +355,7 @@ public class AHumidifier extends Script implements PaintListener, ServerMessageL
 		//Draw Top Left Scoreboard
 		topLeftScoreboard.getWidget(humidifyCastsWidgetIndex).setWidgetText(numberFormatter.format(accumulatedHumidifyCasts));
 		topLeftScoreboard.getWidget(vialsFilledWidgetIndex).setWidgetText(numberFormatter.format(accumulatedFilledVials));
-		topLeftScoreboard.getWidget(approxGoldAccumulatedWidgetIndex).setWidgetText("$" + numberFormatter.format(accumulatedGold));
+		topLeftScoreboard.getWidget(approxGoldAccumulatedWidgetIndex).setWidgetText("$" + numberFormatter.format(accumulatedFilledVials * filledVialMarketPrice));
 		topLeftScoreboard.drawScoreboard(g);
 		
 		//Draw Top Right Scoreboard
@@ -223,11 +372,7 @@ public class AHumidifier extends Script implements PaintListener, ServerMessageL
 				5,
 				5);
 		
-		int wholePercentage = skills.getPercentToNextLevel(Skills.getStatIndex("Magic"));
-		Double percentToWidth = Math.floor(128 * (wholePercentage / 100));
-		
-		log("%" + wholePercentage);
-		
+		Double percentToWidth = new Double(skills.getPercentToNextLevel(Skills.getStatIndex("Magic")));
 		RoundRectangle2D progressBar = new RoundRectangle2D.Float(
 				Scoreboard.gameCanvasRight - 128,
 				topRightScoreboard.getHeight() + 31,
@@ -244,10 +389,39 @@ public class AHumidifier extends Script implements PaintListener, ServerMessageL
 		
 		return ;
 	}
+	
+	/**
+	 * Checks to see if we are able to cast the lunar humidify spell.
+	 * 
+	 * @return							true if player can cast humidify
+	 * @since 0.1
+	 */
+	private boolean canCastHumidify() {
+		boolean hasAstralRune = false, hasFireRune = false, hasWaterRune = false;
 
-	@Override
-	public void serverMessageRecieved(ServerMessageEvent e) {
-		return ;
+		if(getInventoryCount(astralRuneID) >= 1)
+			hasAstralRune = true;
+
+		if(getInventoryCount(fireRuneID) >= 1 || hasFireStaff || hasSteamStaff)
+			hasFireRune = true;
+
+		if(getInventoryCount(waterRuneID) >= 3 || hasWaterStaff || hasSteamStaff)
+			hasWaterRune = true;
+
+		return (hasAstralRune && hasFireRune && hasWaterRune);
+	}
+	
+	/**
+	 * Checks to see if the mouse is in a defined rectangular area.
+	 * 
+	 * @param inArea					Rectangle representing a pixel area that the mouse should be in
+	 * 									@see java.awt.Rectangle
+	 * @return							true if the mouse is within the bounds of inArea
+	 * @since 0.1
+	 */
+	private boolean isMouseInArea(Rectangle inArea) {
+		int x = getMouseLocation().x, y = getMouseLocation().y;
+		return (x >= inArea.x && x <= (inArea.x + inArea.width) && y >= inArea.y && y <= (inArea.y + inArea.height));
 	}
 	
 	/**
@@ -278,6 +452,39 @@ public class AHumidifier extends Script implements PaintListener, ServerMessageL
 	}
 	
 	/**
+	 * Very simple antiban runnable class.
+	 * 
+	 * @version 1.0
+	 * @since 1.0
+	 */
+	public class Antiban implements Runnable {
+		@Override
+		public void run() {
+			while(isThreadsRunning) {
+				switch(random(1, 11) % 2) {
+				case 1:
+					if(random(1,11) % 2 == 0) {
+						isCameraRotating = true;
+						setCameraRotation(random(1,360));
+						isCameraRotating = false;
+					}
+
+					long c1Timeout = System.currentTimeMillis() + random(30000, 60000);
+					while(System.currentTimeMillis() < c1Timeout && isThreadsRunning) {}
+
+					break;
+
+				default:
+					long c2Timeout = System.currentTimeMillis() + random(30000, 60000);
+					while(System.currentTimeMillis() < c2Timeout && isThreadsRunning) {}
+
+					break;
+				}
+			}
+		}
+	}
+	
+	/**
 	 * Monitor class assembles and updates all experience points and levels gained. The
 	 * class also maintains strings for the onRepaint method.
 	 * 
@@ -288,8 +495,14 @@ public class AHumidifier extends Script implements PaintListener, ServerMessageL
 	public class Monitor implements Runnable {
 		@Override
 		public void run() {
-			while(isMonitorRunning) {
-				magicEPEarnedWidgetText = (skills.getCurrSkillLevel(Skills.getStatIndex("Magic")) != startingMagicLevel) ? "" + numberFormatter.format(skills.getCurrentSkillExp(Skills.getStatIndex("Magic")) - startingMagicEP) + " (+" + numberFormatter.format(skills.getCurrSkillLevel(Skills.getStatIndex("Magic")) - startingMagicLevel) + ")" : "" +  numberFormatter.format(skills.getCurrentSkillExp(Skills.getStatIndex("Magic")) - startingMagicEP);
+			while(isThreadsRunning) {
+				currentMagicEP = skills.getCurrentSkillExp(Skills.getStatIndex("Magic"));
+				currentMagicLevel = skills.getCurrSkillLevel(Skills.getStatIndex("Magic"));
+				
+				if(currentMagicLevel > startingMagicLevel)
+					magicEPEarnedWidgetText = numberFormatter.format((currentMagicEP - startingMagicEP)) + " (+" + (currentMagicLevel - startingMagicLevel) + ")";
+				else
+					magicEPEarnedWidgetText = numberFormatter.format((currentMagicEP - startingMagicEP));
 			}
 		}
 	}
