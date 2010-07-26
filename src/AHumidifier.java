@@ -82,32 +82,37 @@ import org.rsbot.script.wrappers.RSInterfaceChild;
 				"</body>" +
 				"</html>")
 public class AHumidifier extends Script implements PaintListener {
+	private boolean isTesting = false;
 	private boolean hasFireStaff = false, hasSteamStaff = false, hasWaterStaff = false;
-	private boolean isCameraRotating = false, isScriptLoaded = false, isThreadsRunning = true; 
+	private boolean isCameraRotating = false, isScriptLoaded = false, isThreadsRunning = true;
+	
+	private double grossProduct, grossCost, netProduct;
 	
 	private int emptyVialID = 229, filledVialID = 227;
 	private int astralRuneID = 9075, fireRuneID = 554, waterRuneID = 555;
 	private int fireStaffID = 1387, steamStaffID = 11736, waterStaffID = 1383;
-	private int filledVialMarketPrice = 0;
+	private int astralRuneMarketPrice = 0, emptyVialMarketPrice = 0, filledVialMarketPrice = 0;
 	private int accumulatedHumidifyCasts = 0, accumulatedFilledVials = 0;
 	private int startingMagicEP = 0, startingMagicLevel = 0, currentMagicEP = 0, currentMagicLevel = 0;
-	private int humidifyCastsWidgetIndex = 0, vialsFilledWidgetIndex = 0, approxGoldAccumulatedWidgetIndex = 0;
+	private int currentGrossProductWidgetIndex = 0, currentGrossCostWidgetIndex = 0, currentNetProductWidgetIndex = 0;
+	private int humidifyCastsWidgetIndex = 0, vialsFilledWidgetIndex = 0;
 	private int currentRuntimeWidgetIndex = 0, magicEPEarnedWidgetIndex = 0;
 	
 	private long startingTime = 0, failsafeTimeout = 0;
 	
 	private Antiban antiban = new Antiban();
 	
-	private Image coinImage, cursorImage, drinkImage, sumImage, timeImage, weatherImage;
+	private Image coinsImage, coinsAddImage, coinsDeleteImage, cursorImage, drinkImage, sumImage, timeImage, weatherImage;
 	private ImageObserver observer;
 	
 	private Monitor monitor = new Monitor();
 	
 	private NumberFormat numberFormatter = NumberFormat.getNumberInstance(Locale.US);
 	
-	private Scoreboard topLeftScoreboard, topRightScoreboard;
+	private Scoreboard bottomLeftScoreboard, topLeftScoreboard, topRightScoreboard;
 	
-	private ScoreboardWidget humidifyCasts, vialsFilled, approxGoldAccumulated;
+	private ScoreboardWidget currentGrossProduct, currentGrossCost, currentNetProduct;
+	private ScoreboardWidget humidifyCasts, vialsFilled;
 	private ScoreboardWidget currentRuntime, magicEPEarned;
 	
 	private String magicEPEarnedWidgetText = "";
@@ -119,7 +124,9 @@ public class AHumidifier extends Script implements PaintListener {
 		try {
 			log.info("Attempting to read image resources from the web...");
 			
-			coinImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/coins.png"));
+			coinsImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/coins.png"));
+			coinsAddImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/coins_add.png"));
+			coinsDeleteImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/coins_delete.png"));
 			cursorImage = ImageIO.read(new URL("http://scripts.allometry.com/app/webroot/img/cursors/cursor-01.png"));
 			drinkImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/drink.png"));
 			sumImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/sum.png"));
@@ -132,11 +139,18 @@ public class AHumidifier extends Script implements PaintListener {
 		}
 		
 		try {
-			log.info("Attempting to get the latest filled vial market price...");
+			log.info("Attempting to get the latest market prices...");
 			
-			GEItemInfo vialItem = grandExchange.loadItemInfo(filledVialID);
-			filledVialMarketPrice = vialItem.getMarketPrice();
+			GEItemInfo astralRuneItem = grandExchange.loadItemInfo(astralRuneID);
+			GEItemInfo emptyVialItem = grandExchange.loadItemInfo(emptyVialID);
+			GEItemInfo filledVialItem = grandExchange.loadItemInfo(filledVialID);
 			
+			astralRuneMarketPrice = astralRuneItem.getMarketPrice();
+			emptyVialMarketPrice = emptyVialItem.getMarketPrice();
+			filledVialMarketPrice = filledVialItem.getMarketPrice();
+			
+			log.info("Success! The astral rune is " + astralRuneMarketPrice + "gp");
+			log.info("Success! The empty vial price is " + emptyVialMarketPrice + "gp");
 			log.info("Success! The filled vial price is " + filledVialMarketPrice + "gp");
 		} catch (Exception e) {
 			log.warning("There was an issue trying to read the filled vial price from the web...");
@@ -161,14 +175,29 @@ public class AHumidifier extends Script implements PaintListener {
 		}
 		
 		try {
+			//Assemble Bottom Left Widgets
+			currentGrossProduct = new ScoreboardWidget(coinsAddImage, "");
+			currentGrossCost = new ScoreboardWidget(coinsDeleteImage, "");
+			currentNetProduct = new ScoreboardWidget(coinsImage, "");
+			
 			//Assemble Top Left Widgets
 			humidifyCasts = new ScoreboardWidget(weatherImage, "");
 			vialsFilled = new ScoreboardWidget(drinkImage, "");
-			approxGoldAccumulated = new ScoreboardWidget(coinImage, "");
 			
 			//Assemble Top Right Widgets 
 			currentRuntime = new ScoreboardWidget(timeImage, "");
 			magicEPEarned = new ScoreboardWidget(sumImage, "");
+			
+			//Assemble Bottom Left Scoreboard
+			bottomLeftScoreboard = new Scoreboard(Scoreboard.BOTTOM_LEFT, 128, 5);		
+			bottomLeftScoreboard.addWidget(currentGrossProduct);
+			currentGrossProductWidgetIndex = 0;
+			
+			bottomLeftScoreboard.addWidget(currentGrossCost);
+			currentGrossCostWidgetIndex = 1;
+			
+			bottomLeftScoreboard.addWidget(currentNetProduct);
+			currentNetProductWidgetIndex = 2;
 			
 			//Assemble Top Left Scoreboard
 			topLeftScoreboard = new Scoreboard(Scoreboard.TOP_LEFT, 128, 5);
@@ -177,9 +206,6 @@ public class AHumidifier extends Script implements PaintListener {
 			
 			topLeftScoreboard.addWidget(vialsFilled);
 			vialsFilledWidgetIndex = 1;
-			
-			topLeftScoreboard.addWidget(approxGoldAccumulated);
-			approxGoldAccumulatedWidgetIndex = 2;
 			
 			//Assemble Top Right Scoreboard
 			topRightScoreboard = new Scoreboard(Scoreboard.TOP_RIGHT, 128, 5);
@@ -196,7 +222,10 @@ public class AHumidifier extends Script implements PaintListener {
 			startingMagicEP = skills.getCurrentSkillExp(Skills.getStatIndex("Magic"));
 			startingMagicLevel = skills.getCurrSkillLevel(Skills.getStatIndex("Magic"));
 			
-			startingTime = System.currentTimeMillis();
+			if(isTesting)
+				startingTime = System.currentTimeMillis() - 3600000;
+			else
+				startingTime = System.currentTimeMillis();
 		} catch (Exception e) {
 			log.warning("There was an issue instantiating some or all objects...");
 		}
@@ -214,7 +243,18 @@ public class AHumidifier extends Script implements PaintListener {
 	
 	@Override
 	public int loop() {
+		if(isTesting) {
+			calculateStatistics();
+			
+			accumulatedFilledVials+=27;
+			accumulatedHumidifyCasts++;
+			
+			return random(1000, 2000);
+		}
+		
 		if(isPaused || isCameraRotating || !isLoggedIn()) return 1;
+		
+		calculateStatistics();
 		
 		if(!canCastHumidify())
 			stopScript(true);
@@ -233,14 +273,17 @@ public class AHumidifier extends Script implements PaintListener {
 			}
 			
 			if(bank.isOpen()) {
-				if(bank.getCount(emptyVialID) <= getInventoryCount() && bank.getCount(emptyVialID) > 1) {
-					bank.withdraw(emptyVialID, bank.getCount(emptyVialID) - 1);
-					wait(random(700, 1000));
-				} else if(bank.getCount(emptyVialID) <= 1) {
-					stopScript(true);
-				} else {
-					bank.withdraw(emptyVialID, 0);
-					wait(random(700, 1000));
+				failsafeTimeout = System.currentTimeMillis() + 5000;
+				while(!isInventoryFull() && System.currentTimeMillis() < failsafeTimeout) {
+					if(bank.getCount(emptyVialID) <= getInventoryCount() && bank.getCount(emptyVialID) > 1) {
+						bank.withdraw(emptyVialID, bank.getCount(emptyVialID) - 1);
+						wait(random(700, 1000));
+					} else if(bank.getCount(emptyVialID) <= 1) {
+						stopScript(true);
+					} else {
+						bank.withdraw(emptyVialID, 0);
+						wait(random(700, 1000));
+					}
 				}
 			}
 			
@@ -252,10 +295,10 @@ public class AHumidifier extends Script implements PaintListener {
 			
 			int emptyVialsInventory = getInventoryCount(emptyVialID);
 
-			failsafeTimeout = System.currentTimeMillis() + 5000;
+			failsafeTimeout = System.currentTimeMillis() + 10000;
 			while(getCurrentTab() != TAB_MAGIC && System.currentTimeMillis() < failsafeTimeout) {
 				openTab(TAB_MAGIC);
-				wait(1000);
+				wait(2000);
 			}
 			
 			if(getCurrentTab() == TAB_MAGIC) {
@@ -264,6 +307,7 @@ public class AHumidifier extends Script implements PaintListener {
 				failsafeTimeout = System.currentTimeMillis() + 5000;
 				while(!isMouseInArea(humidifyInterface.getArea()) && System.currentTimeMillis() < failsafeTimeout) {
 					moveMouse(humidifyInterface.getAbsoluteX() + random(4, 8), humidifyInterface.getAbsoluteY() + random(4, 8), true);
+					wait(500);
 				}
 				
 				if(isMouseInArea(humidifyInterface.getArea())) {
@@ -341,6 +385,7 @@ public class AHumidifier extends Script implements PaintListener {
 		
 		Graphics2D g = (Graphics2D)g2;
 		g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+		g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 		
 		if(!isScriptLoaded) {
 			Scoreboard loadingBoard = new Scoreboard(Scoreboard.BOTTOM_RIGHT, 128, 5);
@@ -353,10 +398,15 @@ public class AHumidifier extends Script implements PaintListener {
 		//Draw Custom Mouse Cursor
 		g.drawImage(cursorImage, getMouseLocation().x - 16, getMouseLocation().y - 16, observer);
 		
+		//Draw Bottom Left Scoreboard
+		bottomLeftScoreboard.getWidget(currentGrossProductWidgetIndex).setWidgetText("$" + numberFormatter.format(grossProduct));
+		bottomLeftScoreboard.getWidget(currentGrossCostWidgetIndex).setWidgetText("$(" + numberFormatter.format(grossCost) + ")");
+		bottomLeftScoreboard.getWidget(currentNetProductWidgetIndex).setWidgetText("$" + numberFormatter.format(netProduct));
+		bottomLeftScoreboard.drawScoreboard(g);
+		
 		//Draw Top Left Scoreboard
 		topLeftScoreboard.getWidget(humidifyCastsWidgetIndex).setWidgetText(numberFormatter.format(accumulatedHumidifyCasts));
 		topLeftScoreboard.getWidget(vialsFilledWidgetIndex).setWidgetText(numberFormatter.format(accumulatedFilledVials));
-		topLeftScoreboard.getWidget(approxGoldAccumulatedWidgetIndex).setWidgetText("$" + numberFormatter.format(accumulatedFilledVials * filledVialMarketPrice));
 		topLeftScoreboard.drawScoreboard(g);
 		
 		//Draw Top Right Scoreboard
@@ -389,6 +439,14 @@ public class AHumidifier extends Script implements PaintListener {
 		g.fill(progressBar);
 		
 		return ;
+	}
+	
+	private void calculateStatistics() {
+		int vialsPerInventory = getInventoryCountExcept(emptyVialID, filledVialID);
+		
+		grossProduct = accumulatedFilledVials * filledVialMarketPrice;
+		grossCost = (vialsPerInventory * emptyVialMarketPrice) + (astralRuneMarketPrice * accumulatedHumidifyCasts);
+		netProduct = grossProduct - grossCost;
 	}
 	
 	/**
@@ -492,7 +550,7 @@ public class AHumidifier extends Script implements PaintListener {
 	 * class also maintains strings for the onRepaint method.
 	 * 
 	 * @author allometry
-	 * @version 1.0
+	 * @version 1.1
 	 * @since 1.0
 	 */
 	public class Monitor implements Runnable {
