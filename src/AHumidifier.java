@@ -305,10 +305,10 @@ public class AHumidifier extends Script implements PaintListener {
 				RSInterfaceChild humidifyInterface = getInterface(430, 29);
 				
 				failsafeTimeout = System.currentTimeMillis() + 5000;
-				while(!isMouseInArea(humidifyInterface.getArea()) && System.currentTimeMillis() < failsafeTimeout) {
-					moveMouse(humidifyInterface.getAbsoluteX() + random(4, 8), humidifyInterface.getAbsoluteY() + random(4, 8), true);
-					wait(500);
-				}
+				moveMouse(humidifyInterface.getAbsoluteX() + random(4, 8), humidifyInterface.getAbsoluteY() + random(4, 8));
+				do {
+					wait(1);
+				} while(!isMouseInArea(humidifyInterface.getArea()) || System.currentTimeMillis() > failsafeTimeout);
 				
 				if(isMouseInArea(humidifyInterface.getArea())) {
 					if(atInterface(humidifyInterface)) {
