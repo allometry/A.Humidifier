@@ -267,13 +267,12 @@ public class AHumidifier extends Script implements PaintListener {
 			}
 			
 			failsafeTimeout = System.currentTimeMillis() + 5000;
-			while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout) {
+			do {
 				bank.open(true);
-				wait(1000);
-			}
+			} while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout);
 			
 			if(bank.isOpen()) {
-				failsafeTimeout = System.currentTimeMillis() + 5000;
+				failsafeTimeout = System.currentTimeMillis() + 5000;				
 				while(!isInventoryFull() && System.currentTimeMillis() < failsafeTimeout) {
 					if(bank.getCount(emptyVialID) <= getInventoryCount() && bank.getCount(emptyVialID) > 1) {
 						bank.withdraw(emptyVialID, bank.getCount(emptyVialID) - 1);
@@ -296,10 +295,10 @@ public class AHumidifier extends Script implements PaintListener {
 			int emptyVialsInventory = getInventoryCount(emptyVialID);
 
 			failsafeTimeout = System.currentTimeMillis() + 10000;
-			while(getCurrentTab() != TAB_MAGIC && System.currentTimeMillis() < failsafeTimeout) {
-				openTab(TAB_MAGIC);
-				wait(2000);
-			}
+			openTab(TAB_MAGIC);
+			do {
+				wait(1);
+			} while(getCurrentTab() != TAB_MAGIC && System.currentTimeMillis() < failsafeTimeout);
 			
 			if(getCurrentTab() == TAB_MAGIC) {
 				RSInterfaceChild humidifyInterface = getInterface(430, 29);
@@ -308,20 +307,14 @@ public class AHumidifier extends Script implements PaintListener {
 				moveMouse(humidifyInterface.getAbsoluteX() + random(4, 8), humidifyInterface.getAbsoluteY() + random(4, 8));
 				do {
 					wait(1);
-				} while(!isMouseInArea(humidifyInterface.getArea()) || System.currentTimeMillis() > failsafeTimeout);
+				} while(!isMouseInArea(humidifyInterface.getArea()) && System.currentTimeMillis() < failsafeTimeout);
 				
 				if(isMouseInArea(humidifyInterface.getArea())) {
 					if(atInterface(humidifyInterface)) {
 						failsafeTimeout = System.currentTimeMillis() + 5000;
-						while(getInventoryCount(filledVialID) != emptyVialsInventory && getCurrentTab() == TAB_MAGIC && System.currentTimeMillis() < failsafeTimeout) {
-							atInterface(humidifyInterface);
-							wait(1000);
-						}
-						
-						failsafeTimeout = System.currentTimeMillis() + 5000;
-						while(getInventoryCount(filledVialID) != emptyVialsInventory && System.currentTimeMillis() < failsafeTimeout) {
-							wait(1000);
-						}
+						do {
+							wait(1);
+						} while(getInventoryCount(filledVialID) != emptyVialsInventory && System.currentTimeMillis() < failsafeTimeout);
 						
 						if(getInventoryCount(filledVialID) == emptyVialsInventory) {
 							accumulatedFilledVials += getInventoryCount(filledVialID);
@@ -330,26 +323,25 @@ public class AHumidifier extends Script implements PaintListener {
 					}
 				}
 			}
-			//return random(1000, 2000);
 			return 1;
 		}
 		
 		if(isInventoryFull()) {
 			failsafeTimeout = System.currentTimeMillis() + 5000;
-			while(getCurrentTab() != TAB_INVENTORY && System.currentTimeMillis() < failsafeTimeout) {
+			do {
 				openTab(TAB_INVENTORY);
-				wait(1000);
-			}
+			} while(getCurrentTab() != TAB_INVENTORY && System.currentTimeMillis() < failsafeTimeout);
 			
 			failsafeTimeout = System.currentTimeMillis() + 5000;
-			while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout) {
+			do {
 				bank.open(true);
-				wait(1000);
-			}
+			} while(!bank.isOpen() || System.currentTimeMillis() > failsafeTimeout);
 			
 			if(bank.isOpen()) {
-				bank.depositAllExcept(astralRuneID, fireRuneID, waterRuneID);
-				wait(random(1250, 1500));
+				failsafeTimeout = System.currentTimeMillis() + 5000;
+				do {
+					bank.depositAllExcept(astralRuneID, fireRuneID, waterRuneID);
+				} while((!inventoryEmptyExcept(astralRuneID) || !inventoryEmptyExcept(astralRuneID, fireRuneID) || !inventoryEmptyExcept(astralRuneID, fireRuneID, waterRuneID)) && System.currentTimeMillis() < failsafeTimeout);
 			}
 			
 			return 1;
