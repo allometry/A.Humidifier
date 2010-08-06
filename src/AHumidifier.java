@@ -260,18 +260,25 @@ public class AHumidifier extends Script implements PaintListener {
 			stopScript(true);
 		
 		if(inventoryEmptyExcept(astralRuneID)) {
-			failsafeTimeout = System.currentTimeMillis() + 5000;
-			while(getCurrentTab() != TAB_INVENTORY && System.currentTimeMillis() < failsafeTimeout) {
-				openTab(TAB_INVENTORY);
-				wait(1000);
-			}
+			log("#01 Inventory only contains astral runes. We're going to get empty vials from the bank!");
 			
+			log("#02 Opening inventory tab...");
+			failsafeTimeout = System.currentTimeMillis() + 5000;
+			do {
+				openTab(TAB_INVENTORY);
+			} while(getCurrentTab() != TAB_INVENTORY && System.currentTimeMillis() < failsafeTimeout);
+			log("#03 Inventory tab " + ((getCurrentTab() == TAB_INVENTORY) ? "opened" : "didn't open") + "!");
+			
+			log("#04 Moving to open the bank...");
 			failsafeTimeout = System.currentTimeMillis() + 5000;
 			do {
 				bank.open(true);
-			} while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout);
+				wait(500);
+			} while(!bank.isOpen() || System.currentTimeMillis() > failsafeTimeout);
+			log("#05 Bank " + ((bank.isOpen()) ? "is open" : "didn't open") + "!");
 			
 			if(bank.isOpen()) {
+				log("#06 Withdrawing empty vials...");
 				failsafeTimeout = System.currentTimeMillis() + 5000;				
 				while(!isInventoryFull() && System.currentTimeMillis() < failsafeTimeout) {
 					if(bank.getCount(emptyVialID) <= getInventoryCount() && bank.getCount(emptyVialID) > 1) {
@@ -294,31 +301,42 @@ public class AHumidifier extends Script implements PaintListener {
 			
 			int emptyVialsInventory = getInventoryCount(emptyVialID);
 
+			log("#07 Opening magic tab...");
 			failsafeTimeout = System.currentTimeMillis() + 10000;
 			openTab(TAB_MAGIC);
 			do {
 				wait(1);
 			} while(getCurrentTab() != TAB_MAGIC && System.currentTimeMillis() < failsafeTimeout);
+			log("#08 Magic tab " + ((getCurrentTab() == TAB_MAGIC) ? "opened" : "didn't open") + "!");
 			
 			if(getCurrentTab() == TAB_MAGIC) {
 				RSInterfaceChild humidifyInterface = getInterface(430, 29);
 				
+				log("#09 Moving mouse to cast humidify...");
 				failsafeTimeout = System.currentTimeMillis() + 5000;
 				moveMouse(humidifyInterface.getAbsoluteX() + random(4, 8), humidifyInterface.getAbsoluteY() + random(4, 8));
 				do {
 					wait(1);
 				} while(!isMouseInArea(humidifyInterface.getArea()) && System.currentTimeMillis() < failsafeTimeout);
+				log("#10 Mouse is hovering over the humidfy spell!");
 				
 				if(isMouseInArea(humidifyInterface.getArea())) {
+					log("#11 Casting spell...");
 					if(atInterface(humidifyInterface)) {
+						log("#12 Bot says it casted the spell...");
+						
+						log("#13 Waiting for spell to succeed...");
 						failsafeTimeout = System.currentTimeMillis() + 5000;
 						do {
 							wait(1);
 						} while(getInventoryCount(filledVialID) != emptyVialsInventory && System.currentTimeMillis() < failsafeTimeout);
 						
 						if(getInventoryCount(filledVialID) == emptyVialsInventory) {
+							log("#14 Spell succeeded!");
 							accumulatedFilledVials += getInventoryCount(filledVialID);
 							accumulatedHumidifyCasts++;
+						} else {
+							log("#15 Spell failed!");
 						}
 					}
 				}
@@ -327,21 +345,28 @@ public class AHumidifier extends Script implements PaintListener {
 		}
 		
 		if(isInventoryFull()) {
+			log("#16 Opening inventory tab...");
 			failsafeTimeout = System.currentTimeMillis() + 5000;
 			do {
 				openTab(TAB_INVENTORY);
 			} while(getCurrentTab() != TAB_INVENTORY && System.currentTimeMillis() < failsafeTimeout);
+			log("#17 Inventory tab " + ((getCurrentTab() == TAB_INVENTORY) ? "opened" : "didn't open") + "!");
 			
+			log("#18 Moving to open the bank...");
 			failsafeTimeout = System.currentTimeMillis() + 5000;
 			do {
 				bank.open(true);
-			} while(!bank.isOpen() || System.currentTimeMillis() > failsafeTimeout);
+				wait(500);
+			} while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout);
+			log("#19 Bank " + ((bank.isOpen()) ? "is open" : "didn't open") + "!");
 			
 			if(bank.isOpen()) {
+				log("#20 Inventory is full of filled vials, banking everything except runes...");
 				failsafeTimeout = System.currentTimeMillis() + 5000;
 				do {
 					bank.depositAllExcept(astralRuneID, fireRuneID, waterRuneID);
 				} while((!inventoryEmptyExcept(astralRuneID) || !inventoryEmptyExcept(astralRuneID, fireRuneID) || !inventoryEmptyExcept(astralRuneID, fireRuneID, waterRuneID)) && System.currentTimeMillis() < failsafeTimeout);
+				log("#21 Banking finished!");
 			}
 			
 			return 1;
