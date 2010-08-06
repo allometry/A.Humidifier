@@ -82,7 +82,7 @@ import org.rsbot.script.wrappers.RSInterfaceChild;
 				"</body>" +
 				"</html>")
 public class AHumidifier extends Script implements PaintListener {
-	private boolean isVerbose = false;
+	private boolean isVerbose = true;
 	private boolean hasFireStaff = false, hasSteamStaff = false, hasWaterStaff = false;
 	private boolean isCameraRotating = false, isScriptLoaded = false, isThreadsRunning = true;
 	
@@ -239,7 +239,7 @@ public class AHumidifier extends Script implements PaintListener {
 	
 	@Override
 	public int loop() {
-		if(isPaused || isCameraRotating || !isLoggedIn()) return 1;
+		if(isPaused || isCameraRotating || !isLoggedIn() || isWelcomeScreen() || isLoginScreen()) return 1;
 		
 		calculateStatistics();
 		
