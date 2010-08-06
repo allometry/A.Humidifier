@@ -261,7 +261,7 @@ public class AHumidifier extends Script implements PaintListener {
 			do {
 				bank.open(true);
 				wait(500);
-			} while(!bank.isOpen() || System.currentTimeMillis() > failsafeTimeout);
+			} while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout);
 			verbose("#05 Bank " + ((bank.isOpen()) ? "is open" : "didn't open") + "!");
 			
 			if(bank.isOpen()) {
