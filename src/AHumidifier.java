@@ -96,13 +96,13 @@ public class AHumidifier extends Script implements PaintListener {
 	private int startingMagicEP = 0, startingMagicLevel = 0, currentMagicEP = 0, currentMagicLevel = 0;
 	private int currentGrossProductWidgetIndex = 0, currentGrossCostWidgetIndex = 0, currentNetProductWidgetIndex = 0;
 	private int humidifyCastsWidgetIndex = 0, vialsFilledWidgetIndex = 0;
-	private int currentRuntimeWidgetIndex = 0, magicEPEarnedWidgetIndex = 0;
+	private int currentRuntimeWidgetIndex = 0, magicEPEarnedWidgetIndex = 0, spellsTogoWidgetIndex = 0;
 	
 	private long startingTime = 0, failsafeTimeout = 0;
 	
 	private Antiban antiban = new Antiban();
 	
-	private Image coinsImage, coinsAddImage, coinsDeleteImage, cursorImage, drinkImage, sumImage, timeImage, weatherImage;
+	private Image coinsImage, coinsAddImage, coinsDeleteImage, cursorImage, drinkImage, sumImage, timeImage, togoImage, weatherImage;
 	private ImageObserver observer;
 	
 	private Monitor monitor = new Monitor();
@@ -113,9 +113,9 @@ public class AHumidifier extends Script implements PaintListener {
 	
 	private ScoreboardWidget currentGrossProduct, currentGrossCost, currentNetProduct;
 	private ScoreboardWidget humidifyCasts, vialsFilled;
-	private ScoreboardWidget currentRuntime, magicEPEarned;
+	private ScoreboardWidget currentRuntime, magicEPEarned, spellsTogo;
 	
-	private String magicEPEarnedWidgetText = "";
+	private String magicEPEarnedWidgetText = "", spellsTogoWidgetText = "";
 	
 	private Thread antibanThread, monitorThread;
 	
@@ -131,6 +131,7 @@ public class AHumidifier extends Script implements PaintListener {
 			drinkImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/drink.png"));
 			sumImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/sum.png"));
 			timeImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/time.png"));
+			togoImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/arrow_rotate_clockwise.png"));
 			weatherImage = ImageIO.read(new URL("http://scripts.allometry.com/icons/weather_rain.png"));
 			
 			log.info("Success! All image resources have been loaded...");
@@ -187,6 +188,7 @@ public class AHumidifier extends Script implements PaintListener {
 			//Assemble Top Right Widgets 
 			currentRuntime = new ScoreboardWidget(timeImage, "");
 			magicEPEarned = new ScoreboardWidget(sumImage, "");
+			spellsTogo = new ScoreboardWidget(togoImage, "");
 			
 			//Assemble Bottom Left Scoreboard
 			bottomLeftScoreboard = new Scoreboard(Scoreboard.BOTTOM_LEFT, 128, 5);		
@@ -214,6 +216,9 @@ public class AHumidifier extends Script implements PaintListener {
 			
 			topRightScoreboard.addWidget(magicEPEarned);
 			magicEPEarnedWidgetIndex = 1;
+			
+			topRightScoreboard.addWidget(spellsTogo);
+			spellsTogoWidgetIndex = 2;
 		} catch (Exception e) {
 			log.warning("There was an issue creating the scoreboard...");
 		}
@@ -416,6 +421,7 @@ public class AHumidifier extends Script implements PaintListener {
 		//Draw Top Right Scoreboard
 		topRightScoreboard.getWidget(currentRuntimeWidgetIndex).setWidgetText(millisToClock(System.currentTimeMillis() - startingTime));
 		topRightScoreboard.getWidget(magicEPEarnedWidgetIndex).setWidgetText(magicEPEarnedWidgetText);
+		topRightScoreboard.getWidget(spellsTogoWidgetIndex).setWidgetText(spellsTogoWidgetText);
 		topRightScoreboard.drawScoreboard(g);
 		
 		//Draw Magic Progress Bar
@@ -578,6 +584,7 @@ public class AHumidifier extends Script implements PaintListener {
 				while(isLoggedIn() && !isPaused && isThreadsRunning) {
 					currentMagicEP = skills.getCurrentSkillExp(Skills.getStatIndex("Magic"));
 					currentMagicLevel = skills.getCurrSkillLevel(Skills.getStatIndex("Magic"));
+					spellsTogoWidgetText = numberFormatter.format(Math.ceil(skills.getXPToNextLevel(Skills.getStatIndex("Magic")) / 65));
 					
 					if(currentMagicLevel > startingMagicLevel)
 						magicEPEarnedWidgetText = numberFormatter.format((currentMagicEP - startingMagicEP)) + " (+" + (currentMagicLevel - startingMagicLevel) + ")";
