@@ -142,22 +142,30 @@ public class AHumidifier extends Script implements PaintListener {
 			log.warning("There was an issue trying to read the image resources from the web...");
 		}
 		
+		if(args.get("fill").equalsIgnoreCase("clay")) {
+		   unfilledID = clayID;
+		   filledID = softClayID;
+	   } else {
+	      unfilledID = emptyVialID;
+		   filledID = filledVialID;
+	   }
+		
 		try {
 			log.info("Attempting to get the latest market prices...");
 			
 			GEItemInfo astralRuneItem = grandExchange.loadItemInfo(astralRuneID);
-			GEItemInfo emptyVialItem = grandExchange.loadItemInfo(emptyVialID);
-			GEItemInfo filledVialItem = grandExchange.loadItemInfo(filledVialID);
+			GEItemInfo emptyVialItem = grandExchange.loadItemInfo(unfilledID);
+			GEItemInfo filledVialItem = grandExchange.loadItemInfo(filledID);
 			
 			astralRuneMarketPrice = astralRuneItem.getMarketPrice();
 			emptyVialMarketPrice = emptyVialItem.getMarketPrice();
 			filledVialMarketPrice = filledVialItem.getMarketPrice();
 			
 			log.info("Success! The astral rune is " + astralRuneMarketPrice + "gp");
-			log.info("Success! The empty vial price is " + emptyVialMarketPrice + "gp");
-			log.info("Success! The filled vial price is " + filledVialMarketPrice + "gp");
+			log.info("Success! The empty price is " + emptyVialMarketPrice + "gp");
+			log.info("Success! The filled price is " + filledVialMarketPrice + "gp");
 		} catch (Exception e) {
-			log.warning("There was an issue trying to read the filled vial price from the web...");
+			log.warning("There was an issue trying to read prices from the web...");
 		}
 		
 		try {
@@ -237,14 +245,6 @@ public class AHumidifier extends Script implements PaintListener {
 		} catch (Exception e) {
 			log.warning("There was an issue instantiating some or all objects...");
 		}
-		
-		if(args.get("fill").equalsIgnoreCase("clay")) {
-		   unfilledID = clayID;
-		   filledID = softClayID;
-	   } else {
-	      unfilledID = emptyVialID;
-		   filledID = filledVialID;
-	   }
 		
 		antibanThread = new Thread(antiban);
 		monitorThread = new Thread(monitor);
