@@ -473,7 +473,7 @@ public class AHumidifier extends Script implements PaintListener {
 	 * @since 1.0
 	 */
 	private void calculateStatistics() {
-		int vialsPerInventory = getInventoryCountExcept(emptyVialID, filledVialID);
+		int vialsPerInventory = getInventoryCountExcept(unfilledID, filledID);
 		
 		grossProduct = accumulatedFilledVials * filledVialMarketPrice;
 		grossCost = (vialsPerInventory * emptyVialMarketPrice) + (astralRuneMarketPrice * accumulatedHumidifyCasts);
