@@ -76,9 +76,9 @@ import org.rsbot.script.wrappers.RSInterfaceChild;
 				"<body>" +
 				"<p>Allometry Humidifier</p>" +
 				"<p>Supports Fire, Water and Steam staffs</p>" +
-				"<p>Astrals in inventory. Empty vials visible in bank!</p>" +
-				"<p>For more info, visit the" +
-				"thread on the RuneDev forums!</p>" +
+				"<p>Astrals in inventory. Empty vials or clay visible in bank!</p>" +
+				"<p>Options</p>" +
+				"<p><select name=\"fill\"><option value=\"vial\">Vial</option><option value=\"clay\">Clay</option></select></p>" + 
 				"</body>" +
 				"</html>")
 public class AHumidifier extends Script implements PaintListener {
@@ -89,6 +89,8 @@ public class AHumidifier extends Script implements PaintListener {
 	private double grossProduct, grossCost, netProduct;
 	
 	private int emptyVialID = 229, filledVialID = 227;
+	private int clayID = 434, softClayID = 1761;
+	private int unfilledID = 0, filledID = 0;
 	private int astralRuneID = 9075, fireRuneID = 554, waterRuneID = 555;
 	private int fireStaffID = 1387, steamStaffID = 11736, waterStaffID = 1383;
 	private int astralRuneMarketPrice = 0, emptyVialMarketPrice = 0, filledVialMarketPrice = 0;
@@ -236,6 +238,14 @@ public class AHumidifier extends Script implements PaintListener {
 			log.warning("There was an issue instantiating some or all objects...");
 		}
 		
+		if(args.get("fill").equalsIgnoreCase("clay")) {
+		   unfilledID = clayID;
+		   filledID = softClayID;
+	   } else {
+	      unfilledID = emptyVialID;
+		   filledID = filledVialID;
+	   }
+		
 		antibanThread = new Thread(antiban);
 		monitorThread = new Thread(monitor);
 		
@@ -248,129 +258,129 @@ public class AHumidifier extends Script implements PaintListener {
 	}
 	
 	@Override
-	public int loop() {
-		if(isPaused || isCameraRotating || !isLoggedIn() || isWelcomeScreen() || isLoginScreen()) return 1;
-		
-		calculateStatistics();
-		
-		if(!canCastHumidify())
-			stopScript(true);
-		
-		if(inventoryEmptyExcept(astralRuneID)) {
-			verbose("#01 Inventory only contains astral runes. We're going to get empty vials from the bank!");
-			
-			verbose("#02 Opening inventory tab...");
-			failsafeTimeout = System.currentTimeMillis() + 5000;
-			do {
-				openTab(TAB_INVENTORY);
-			} while(getCurrentTab() != TAB_INVENTORY && System.currentTimeMillis() < failsafeTimeout);
-			verbose("#03 Inventory tab " + ((getCurrentTab() == TAB_INVENTORY) ? "opened" : "didn't open") + "!");
-			
-			verbose("#04 Moving to open the bank...");
-			failsafeTimeout = System.currentTimeMillis() + 5000;
-			do {
-				bank.open(true);
-				wait(500);
-			} while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout);
-			verbose("#05 Bank " + ((bank.isOpen()) ? "is open" : "didn't open") + "!");
-			
-			if(bank.isOpen()) {
-				verbose("#06 Withdrawing empty vials...");
-				failsafeTimeout = System.currentTimeMillis() + 5000;				
-				while(!isInventoryFull() && System.currentTimeMillis() < failsafeTimeout) {
-					if(bank.getCount(emptyVialID) <= getInventoryCount() && bank.getCount(emptyVialID) > 1) {
-						bank.withdraw(emptyVialID, bank.getCount(emptyVialID) - 1);
-						wait(random(700, 1000));
-					} else if(bank.getCount(emptyVialID) <= 1) {
-						stopScript(true);
-					} else {
-						bank.withdraw(emptyVialID, 0);
-						wait(random(700, 1000));
-					}
-				}
-			}
-			
-			return 1;
-		}
-		
-		if(getInventoryCount(emptyVialID) > 0) {
-			if(bank.isOpen()) bank.close();
-			
-			int emptyVialsInventory = getInventoryCount(emptyVialID);
+   public int loop() {
+   	if(isPaused || isCameraRotating || !isLoggedIn() || isWelcomeScreen() || isLoginScreen()) return 1;
 
-			verbose("#07 Opening magic tab...");
-			failsafeTimeout = System.currentTimeMillis() + 10000;
-			openTab(TAB_MAGIC);
-			do {
-				wait(1);
-			} while(getCurrentTab() != TAB_MAGIC && System.currentTimeMillis() < failsafeTimeout);
-			verbose("#08 Magic tab " + ((getCurrentTab() == TAB_MAGIC) ? "opened" : "didn't open") + "!");
-			
-			if(getCurrentTab() == TAB_MAGIC) {
-				RSInterfaceChild humidifyInterface = getInterface(430, 29);
-				
-				verbose("#09 Moving mouse to cast humidify...");
-				failsafeTimeout = System.currentTimeMillis() + 5000;
-				moveMouse(humidifyInterface.getAbsoluteX() + random(4, 8), humidifyInterface.getAbsoluteY() + random(4, 8));
-				do {
-					wait(1);
-				} while(!isMouseInArea(humidifyInterface.getArea()) && System.currentTimeMillis() < failsafeTimeout);
-				verbose("#10 Mouse is hovering over the humidfy spell!");
-				
-				if(isMouseInArea(humidifyInterface.getArea())) {
-					verbose("#11 Casting spell...");
-					if(atInterface(humidifyInterface)) {
-						verbose("#12 Bot says it casted the spell...");
-						
-						verbose("#13 Waiting for spell to succeed...");
-						failsafeTimeout = System.currentTimeMillis() + 5000;
-						do {
-							wait(1);
-						} while(getInventoryCount(filledVialID) != emptyVialsInventory && System.currentTimeMillis() < failsafeTimeout);
-						
-						if(getInventoryCount(filledVialID) == emptyVialsInventory) {
-							verbose("#14 Spell succeeded!");
-							accumulatedFilledVials += getInventoryCount(filledVialID);
-							accumulatedHumidifyCasts++;
-						} else {
-							verbose("#15 Spell failed!");
-						}
-					}
-				}
-			}
-			return 1;
-		}
-		
-		if(isInventoryFull()) {
-			verbose("#16 Opening inventory tab...");
-			failsafeTimeout = System.currentTimeMillis() + 5000;
-			do {
-				openTab(TAB_INVENTORY);
-			} while(getCurrentTab() != TAB_INVENTORY && System.currentTimeMillis() < failsafeTimeout);
-			verbose("#17 Inventory tab " + ((getCurrentTab() == TAB_INVENTORY) ? "opened" : "didn't open") + "!");
-			
-			verbose("#18 Moving to open the bank...");
-			failsafeTimeout = System.currentTimeMillis() + 5000;
-			do {
-				bank.open(true);
-				wait(500);
-			} while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout);
-			verbose("#19 Bank " + ((bank.isOpen()) ? "is open" : "didn't open") + "!");
-			
-			if(bank.isOpen()) {
-				verbose("#20 Inventory is full of filled vials, banking everything except runes...");
-				failsafeTimeout = System.currentTimeMillis() + 5000;
-				do {
-					bank.depositAllExcept(astralRuneID, fireRuneID, waterRuneID);
-				} while((!inventoryEmptyExcept(astralRuneID) || !inventoryEmptyExcept(astralRuneID, fireRuneID) || !inventoryEmptyExcept(astralRuneID, fireRuneID, waterRuneID)) && System.currentTimeMillis() < failsafeTimeout);
-				verbose("#21 Banking finished!");
-			}
-			
-			return 1;
-		}
-		
-		return 1;
-	}
+   	calculateStatistics();
+
+   	if(!canCastHumidify())
+   		stopScript(true);
+
+   	if(inventoryEmptyExcept(astralRuneID)) {
+   		verbose("#01 Inventory only contains astral runes. We're going to get empty vials from the bank!");
+
+   		verbose("#02 Opening inventory tab...");
+   		failsafeTimeout = System.currentTimeMillis() + 5000;
+   		do {
+   			openTab(TAB_INVENTORY);
+   		} while(getCurrentTab() != TAB_INVENTORY && System.currentTimeMillis() < failsafeTimeout);
+   		verbose("#03 Inventory tab " + ((getCurrentTab() == TAB_INVENTORY) ? "opened" : "didn't open") + "!");
+
+   		verbose("#04 Moving to open the bank...");
+   		failsafeTimeout = System.currentTimeMillis() + 5000;
+   		do {
+   			bank.open(true);
+   			wait(500);
+   		} while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout);
+   		verbose("#05 Bank " + ((bank.isOpen()) ? "is open" : "didn't open") + "!");
+
+   		if(bank.isOpen()) {
+   			verbose("#06 Withdrawing empty vials...");
+   			failsafeTimeout = System.currentTimeMillis() + 5000;				
+   			while(!isInventoryFull() && System.currentTimeMillis() < failsafeTimeout) {
+   				if(bank.getCount(unfilledID) <= getInventoryCount() && bank.getCount(unfilledID) > 1) {
+   					bank.withdraw(unfilledID, bank.getCount(unfilledID) - 1);
+   					wait(random(700, 1000));
+   				} else if(bank.getCount(unfilledID) <= 1) {
+   					stopScript(true);
+   				} else {
+   					bank.withdraw(unfilledID, 0);
+   					wait(random(700, 1000));
+   				}
+   			}
+   		}
+
+   		return 1;
+   	}
+
+   	if(getInventoryCount(unfilledID) > 0) {
+   		if(bank.isOpen()) bank.close();
+
+   		int emptyVialsInventory = getInventoryCount(unfilledID);
+
+   		verbose("#07 Opening magic tab...");
+   		failsafeTimeout = System.currentTimeMillis() + 10000;
+   		openTab(TAB_MAGIC);
+   		do {
+   			wait(1);
+   		} while(getCurrentTab() != TAB_MAGIC && System.currentTimeMillis() < failsafeTimeout);
+   		verbose("#08 Magic tab " + ((getCurrentTab() == TAB_MAGIC) ? "opened" : "didn't open") + "!");
+
+   		if(getCurrentTab() == TAB_MAGIC) {
+   			RSInterfaceChild humidifyInterface = getInterface(430, 29);
+
+   			verbose("#09 Moving mouse to cast humidify...");
+   			failsafeTimeout = System.currentTimeMillis() + 5000;
+   			moveMouse(humidifyInterface.getAbsoluteX() + random(4, 8), humidifyInterface.getAbsoluteY() + random(4, 8));
+   			do {
+   				wait(1);
+   			} while(!isMouseInArea(humidifyInterface.getArea()) && System.currentTimeMillis() < failsafeTimeout);
+   			verbose("#10 Mouse is hovering over the humidfy spell!");
+
+   			if(isMouseInArea(humidifyInterface.getArea())) {
+   				verbose("#11 Casting spell...");
+   				if(atInterface(humidifyInterface)) {
+   					verbose("#12 Bot says it casted the spell...");
+
+   					verbose("#13 Waiting for spell to succeed...");
+   					failsafeTimeout = System.currentTimeMillis() + 5000;
+   					do {
+   						wait(1);
+   					} while(getInventoryCount(filledID) != emptyVialsInventory && System.currentTimeMillis() < failsafeTimeout);
+
+   					if(getInventoryCount(filledID) == emptyVialsInventory) {
+   						verbose("#14 Spell succeeded!");
+   						accumulatedFilledVials += getInventoryCount(filledID);
+   						accumulatedHumidifyCasts++;
+   					} else {
+   						verbose("#15 Spell failed!");
+   					}
+   				}
+   			}
+   		}
+   		return 1;
+   	}
+
+   	if(isInventoryFull()) {
+   		verbose("#16 Opening inventory tab...");
+   		failsafeTimeout = System.currentTimeMillis() + 5000;
+   		do {
+   			openTab(TAB_INVENTORY);
+   		} while(getCurrentTab() != TAB_INVENTORY && System.currentTimeMillis() < failsafeTimeout);
+   		verbose("#17 Inventory tab " + ((getCurrentTab() == TAB_INVENTORY) ? "opened" : "didn't open") + "!");
+
+   		verbose("#18 Moving to open the bank...");
+   		failsafeTimeout = System.currentTimeMillis() + 5000;
+   		do {
+   			bank.open(true);
+   			wait(500);
+   		} while(!bank.isOpen() && System.currentTimeMillis() < failsafeTimeout);
+   		verbose("#19 Bank " + ((bank.isOpen()) ? "is open" : "didn't open") + "!");
+
+   		if(bank.isOpen()) {
+   			verbose("#20 Inventory is full of filled vials, banking everything except runes...");
+   			failsafeTimeout = System.currentTimeMillis() + 5000;
+   			do {
+   				bank.depositAllExcept(astralRuneID, fireRuneID, waterRuneID);
+   			} while((!inventoryEmptyExcept(astralRuneID) || !inventoryEmptyExcept(astralRuneID, fireRuneID) || !inventoryEmptyExcept(astralRuneID, fireRuneID, waterRuneID)) && System.currentTimeMillis() < failsafeTimeout);
+   			verbose("#21 Banking finished!");
+   		}
+
+   		return 1;
+   	}
+
+   	return 1;
+   }
 	
 	@Override
 	public void onFinish() {
